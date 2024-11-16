@@ -1,31 +1,67 @@
 import os
 import shutil
 import time
+import pathlib
 import tkinter as tk
 from PIL import ImageTk, Image
 
 
-class App:
-    PARAMETRS = ['Создать директорию', 'Переименовать файл', 'Переименовать директорию', 'Выйти']
+class PathAnalyzer:
 
-    def __init__(self, root, path):
-        self.root = root
-        self.path = path
-        self.error_message = ''
-        self.timestamp = False
-        
+    def __init__(self, path):
+        self.path = pathlib.Path(path)
         self.dirs = []
         self.files = []
-        self.selected_file = ''
+        self.total_files = self._total_files()
 
+        self.generator_files = self.get_files_generator()
+
+    def get_dirs(self):
+        self.dirs = [subdirs for subdirs in self.path.iterdir() if subdirs.is_dir()]
+        return self.get_dirs
+
+    def get_files(self):
+        self.files = [files for files in self.path.iterdir() if files.is_file()]
+        return self.files
+
+    def _total_files(self):
+        return len([files for files in self.path.iterdir() if files.is_file()])
+
+    def get_files_generator(self):
+        for object in self.path.iterdir():
+            if object.is_file():
+                yield object
+
+
+class SorterImage(PathAnalyzer):
+
+    def __init__(self, root, path):
+        super().__init__(path)
+        self.get_dirs()
+        self.__add_func()
+        
+        self.root = root
+        self.error_message = ''
+        self.timestamp = False
+        self._EXIT = False
+        self.selected_file = ''
+        self._select_file()
+
+        self._DIRS_PARAMETRS = [['Создать директорию', self.create_dir], 
+                               ['Переименовать директорию', self.rename_dir], 
+                               ['Отмена']]
+        self.dict_dirs_parameters = {i: parameters for i, parameters in enumerate(self._DIRS_PARAMETRS, 1)}
+        self._FILE_PARAMETRS = [['Переименовать файл', self.rename_file], 
+                               ['Удалить файл', self.remove_file], 
+                               ['Отмена']]
+        self.dict_file_parameters = {i: parameters for i, parameters in enumerate(self._FILE_PARAMETRS, 1)}
+        self._PARAMETERS = [['Редактировать файл', self.edit_file], 
+                          ['Редактировать директорию', self.edit_dir], 
+                          ['Выйти', self.exit_app]]
+        self.dict_parameters = {i: parameters for i, parameters in enumerate(self.dirs + self._PARAMETERS, 1)}
+        
         self.height_window = self.root.winfo_screenheight()
         self.width_window = self.root.winfo_screenwidth() * 0.4
-        
-        self.get_dirs()
-        self.get_files()
-        self.total_files = len(self.files)
-        self._select_file()
-        self.dict_parameters = {i: parameters for i, parameters in enumerate(self.dirs + self.PARAMETRS, 1)}
 
         self.c = tk.Canvas(self.root, width=self.width_window, height=self.height_window)
         self.c.pack()
@@ -40,63 +76,53 @@ class App:
         self.c.create_image(self.width_window // 2, self.height_window // 2, image=self.imgtk)
         img.close()
 
-    def get_dirs(self):
-        self.dirs = []
-        all_objects = os.listdir(self.path)
-        for object in all_objects:
-            path_dir = self.path + "/" + object
-            if os.path.isdir(path_dir):
-                self.dirs.append(path_dir)
-    
-    def get_files(self):
-        all_objects = os.listdir(self.path)
-        for object in all_objects:
-            path_file = self.path + '/' + object
-            if os.path.isfile(path_file):
-                self.files.append(path_file)
+    def __add_func(self):
+        self.dirs = list(map(lambda x: [x, self.move_file], self.dirs))
 
     def rename_file(self):
         name = input('Введите новое имя: ')
-        _, ext = os.path.splitext(self.selected_file)
-        try:
-            if self.timestamp:
-                name += str(int(time.time()))
-            os.rename(self.selected_file, f'{self.path}/{name}{ext}')
-            self.selected_file = f'{self.path}/{name}{ext}'
-        except FileExistsError:
-            self.error_message = "Файл с таким именем уже существует"         
+        ext = self.selected_file.suffix
+        if self.timestamp:
+            name += str(int(time.time()))
+        path_file = self.path.joinpath(name).with_suffix(ext)
+        if path_file.exists():
+            self.error_message = f'Файл с именем <{path_file.name}> уже существует'
+            return
+        self.selected_file = self.selected_file.replace(path_file)          
     
-    def rename_dir(self, number_dir):
+    def rename_dir(self):
+        number_dir = int(input('Введите номер директории: '))
         name = input('Введите новое имя: ')
-        
-        try:
-            os.rename(self.dict_parameters[number_dir], f'{self.path}/{name}')
-            self.get_dirs()
-            self._update_parameters()
-        except FileExistsError:
-            self.error_message = "Файл с таким именем уже существует"   
+        path_dir = self.path.joinpath(name)
+        if path_dir.exists():
+            self.error_message = f'Директория с именем <{path_dir.name}> уже существует'
+            return
+        self.dict_parameters[number_dir][0] = self.dict_parameters[number_dir][0].replace(path_dir)
 
     def create_dir(self):
         name_dir = input('Введите название директории: ')
         try:
-            os.mkdir(self.path + '/' + name_dir)
+            path_dir = self.path.joinpath(name_dir)
+            path_dir.mkdir()
             self.get_dirs()
+            self.__add_func()
             self._update_parameters()
         except FileExistsError:
-            self.error_message = 'Директория с таким названием уже существует'
+            self.error_message = f'Директория с именем <{path_dir.name}> уже существует'
 
     def _update_parameters(self):
-        self.dict_parameters = {i: parameters for i, parameters in enumerate(self.dirs + self.PARAMETRS, 1)}
+        self.dict_parameters = {i: parameters for i, parameters in enumerate(self.dirs + self._PARAMETERS, 1)}
 
     def exit_app(self):
         self.root.destroy()
+        self._EXIT = True
 
     def _select_file(self):
-        self.selected_file = self.files.pop(0)
+        self.selected_file = next(self.generator_files)
 
     def move_file(self, number_dir):
         try:
-            shutil.move(self.selected_file,self.dict_parameters[number_dir])
+            shutil.move(self.selected_file,self.dict_parameters[number_dir][0])
             self._select_file()
             self.total_files -= 1
         except shutil.Error:
@@ -110,7 +136,37 @@ class App:
         file_size = round(os.path.getsize(self.selected_file) / 1_048_576, 3)
         print(f'Файл: {os.path.basename(self.selected_file)}')
         print(f'Размер файла (мб): {file_size}')
-        
+
+    def edit_dir(self):
+        print()
+        for i in self.dict_dirs_parameters:
+            print(f'{i} - {self.dict_dirs_parameters[i][0]}'.ljust(20), end=' ')
+        print()
+        answer = int(input('Что сделать: '))
+        if answer == 3:
+            return
+        else:
+            self.dict_dirs_parameters[answer][1]()
+
+    def edit_file(self):
+        print()
+        for i in self.dict_file_parameters:
+            print(f'{i} - {self.dict_file_parameters[i][0]}'.ljust(20), end=' ')
+        print()
+        answer = int(input('Что сделать: '))
+        if answer == 3:
+            return
+        else:
+            self.dict_file_parameters[answer][1]()
+
+    def remove_file(self):
+        print('1 - да     2 - нет')
+        answer = int(input('Вы уверены, что хотите удалить безвозвратно файл? - '))
+        if answer == 1:
+            self.selected_file.unlink()
+            self._select_file()
+        return
+
     def main(self):
         timestamp_flags = input('Ставить метку времени при изменении имени файла (д/н): ')
         while timestamp_flags.lower() not in ('д', 'н'):
@@ -124,7 +180,10 @@ class App:
             self.view_photo(self.selected_file)
             counter = 0
             for i in self.dict_parameters:
-                print(f'{i} - {self.dict_parameters[i].split('/')[-1]}'.ljust(20), end=' ')
+                if isinstance(self.dict_parameters[i][0], pathlib.WindowsPath):
+                    print(f'{i} - {self.dict_parameters[i][0].name.split('/')[-1]}'.ljust(20), end=' ')
+                else:
+                    print(f'{i} - {self.dict_parameters[i][0]}'.ljust(20), end=' ')
                 counter += 1
                 if counter == 3:
                     print('\n', end='')
@@ -138,22 +197,15 @@ class App:
 
             answer = int(answer)
             if answer <= len(self.dirs):
-                self.move_file(answer)
-            elif answer == len(self.dirs) + 1:
-                self.create_dir()
-            elif answer == len(self.dirs) + 2:
-                self.rename_file()
-            elif answer == len(self.dirs) + 3:
-                number_dir = int(input('Введите номер директории: '))
-                self.rename_dir(number_dir)
-            elif answer == len(self.dirs) + 4:
-                self.exit_app()
+                self.dict_parameters[answer][1](answer)
+            else:
+                self.dict_parameters[answer][1]()
+            if self._EXIT:
                 return
 
 if __name__ == '__main__':
     root = tk.Tk()
     root.geometry("-0+0")
     path = input('Введите путь к файлам и директориям: ')
-
-    app = App(root, path)
+    app = SorterImage(root, path)
     root.mainloop()
