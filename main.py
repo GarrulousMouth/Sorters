@@ -65,7 +65,8 @@ class SorterImage(PathAnalyzer):
                                ['Удалить файл', self.remove_file], 
                                ['Отмена']]
         self.dict_file_parameters = {i: parameters for i, parameters in enumerate(self._FILE_PARAMETRS, 1)}
-        self._PARAMETERS = [['Редактировать файл', self.edit_file], 
+        self._PARAMETERS = [['Далее', self.next_file], 
+                          ['Редактировать файл', self.edit_file], 
                           ['Редактировать директорию', self.edit_dir], 
                           ['Выйти', self.exit_app]]
         self.dict_parameters = {i: parameters for i, parameters in enumerate(self.dirs + self._PARAMETERS, 1)}
@@ -128,9 +129,12 @@ class SorterImage(PathAnalyzer):
         self._EXIT = True
 
     def _select_file(self):
-        self.selected_file = next(self.generator_files)
-        while self.selected_file.suffix[1:] not in self.EXTENSIONS['image']:
+        try:
             self.selected_file = next(self.generator_files)
+            while self.selected_file.suffix[1:] not in self.EXTENSIONS['image']:
+                self.selected_file = next(self.generator_files)
+        except StopIteration:
+            self.error_message = "Были обработаны все изображения в директории"
 
     def move_file(self, number_dir):
         try:
@@ -178,6 +182,9 @@ class SorterImage(PathAnalyzer):
             self.selected_file.unlink()
             self._select_file()
         return
+
+    def next_file(self):
+        self._select_file()
 
     def main(self):
         timestamp_flags = input('Ставить метку времени при изменении имени файла (д/н): ')
