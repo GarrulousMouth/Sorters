@@ -3,7 +3,7 @@ import shutil
 import time
 import pathlib
 import tkinter as tk
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, UnidentifiedImageError
 
 
 class PathAnalyzer:
@@ -79,13 +79,16 @@ class SorterImage(PathAnalyzer):
         self.main()
 
     def view_photo(self, image):
-        img = Image.open(image)
-        self.width_percent = self.width_window / float(img.size[0])
-        self.height_size = int(float(img.size[1]) * float(self.width_percent))
-        img = img.resize((int(self.width_window), self.height_size))
-        self.imgtk = ImageTk.PhotoImage(img)
-        self.c.create_image(self.width_window // 2, self.height_window // 2, image=self.imgtk)
-        img.close()
+        try:
+            img = Image.open(image)
+            self.width_percent = self.width_window / float(img.size[0])
+            self.height_size = int(float(img.size[1]) * float(self.width_percent))
+            img = img.resize((int(self.width_window), self.height_size))
+            self.imgtk = ImageTk.PhotoImage(img)
+            self.c.create_image(self.width_window // 2, self.height_window // 2, image=self.imgtk)
+            img.close()
+        except UnidentifiedImageError:
+            self.exit_app()
 
     def __add_func(self):
         self.dirs = list(map(lambda x: [x, self.move_file], self.dirs))
@@ -135,6 +138,7 @@ class SorterImage(PathAnalyzer):
                 self.selected_file = next(self.generator_files)
         except StopIteration:
             self.error_message = "Были обработаны все изображения в директории"
+            self._EXIT = True
 
     def move_file(self, number_dir):
         try:
@@ -194,6 +198,7 @@ class SorterImage(PathAnalyzer):
         if timestamp_flags == 'д':
             self.timestamp = True
         while True:
+            
             os.system('cls')
             self.get_info_file()
             self.view_photo(self.selected_file)
@@ -220,7 +225,9 @@ class SorterImage(PathAnalyzer):
             else:
                 self.dict_parameters[answer][1]()
             if self._EXIT:
+
                 return
+            
 
 if __name__ == '__main__':
     root = tk.Tk()
