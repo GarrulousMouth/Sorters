@@ -7,6 +7,16 @@ from PIL import ImageTk, Image
 
 
 class PathAnalyzer:
+    EXTENSIONS = {
+        'video': ['mp4', 'mov', 'avi', 'mkv', 'wmv', '3gp', '3g2', 'mpg', 'mpeg', 'm4v', 
+              'h264', 'flv', 'rm', 'swf', 'vob'],
+
+        'audio': ['mp3', 'wav', 'ogg', 'flac', 'aif', 'mid', 'midi', 'mpa', 'wma', 'wpl',
+              'cda'],
+
+        'image': ['jpg', 'png', 'bmp', 'ai', 'psd', 'ico', 'jpeg', 'ps', 'svg', 'tif', 
+              'tiff'],
+    }
 
     def __init__(self, path):
         self.path = pathlib.Path(path)
@@ -119,6 +129,8 @@ class SorterImage(PathAnalyzer):
 
     def _select_file(self):
         self.selected_file = next(self.generator_files)
+        while self.selected_file.suffix[1:] not in self.EXTENSIONS['image']:
+            self.selected_file = next(self.generator_files)
 
     def move_file(self, number_dir):
         try:
