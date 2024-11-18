@@ -145,6 +145,7 @@ class SorterImage(PathAnalyzer):
         if answer == 1:
             self.selected_file.unlink()
             self._select_file()
+            self.total_files -= 1
         return
 
     def next_file(self):
